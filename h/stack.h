@@ -2,32 +2,11 @@
 
 #define STACK_H
 
+#include "debug.h"
 #include "errorHandle.h"
-#define STK_DEBUG // FIX for debug only
+#include <stddef.h>
 
-#ifdef STK_DEBUG
-
-#define ON_DEBUG(...) __VA_ARGS__
-
-#else
-
-#define ON_DEBUG(...)
-
-#endif
-
-#include <cstddef>
-typedef int StackElem_t; // TODO remove it
-
-struct Stack_t
-{
-    StackElem_t *data;
-    size_t capacity;
-    size_t size;
-
-    ON_DEBUG(const char *dName);
-    ON_DEBUG(const char *dCreationFile);
-    ON_DEBUG(const size_t dCreationLine);
-};
+const size_t cStackCapMultiplierOnExtend = 2;
 
 struct StackDebugData
 {
@@ -36,20 +15,31 @@ struct StackDebugData
     const size_t dCreationLine;
 };
 
-bool VerifyStack(const Stack_t *const stk);
+typedef int StackElem_t; // TODO remove it
 
-Error StackInit(Stack_t *const stk, const size_t capacity ON_DEBUG(, StackDebugData *const debugData));
+struct Stack_t
+{
+    StackElem_t *data;
+    size_t capacity;
+    size_t size;
 
-Error StackPush(Stack_t *const stl, StackElem_t element);
+    ONDEBUG(StackDebugData *debugData);
+};
 
-StackElem_t StackPop(Stack_t *const stk, Error *const errorPtr);
+bool StackVerify(const Stack_t *const stk);
 
-Error StackDestroy(Stack_t *const stk);
+Error StackCreate(Stack_t **stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData));
+
+Error StackPush(Stack_t *const stk, StackElem_t element);
+
+StackElem_t StackPop(Stack_t *const stk, Error *const error);
+
+void StackDestroy(Stack_t *const stk);
 
 Error StackDump(const Stack_t *const stk);
 
-Error ExtendStack(Stack_t *stk);
+Error StackExtend(Stack_t *stk);
 
-Error ShrinkStack(Stack_t *stk);
+Error StackResize(Stack_t *stk, size_t newCapacity);
 
 #endif

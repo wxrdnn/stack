@@ -1,5 +1,6 @@
 #include "h/errorHandle.h"
 #include "h/colors.h"
+#include "h/output.h"
 #include "h/utils.h"
 #include <cassert>
 #include <errno.h>
@@ -162,4 +163,9 @@ bool IsSuccess(const Error *const error)
 bool IsFail(const Error *const error)
 {
     return error->exitCode != ecSuccess;
+}
+
+Error CreateSuccess()
+{
+    return CreateError(ecSuccess, "");
 }

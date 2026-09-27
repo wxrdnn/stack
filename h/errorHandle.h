@@ -68,6 +68,8 @@ bool IsSuccess(const Error *const error);
 
 bool IsFail(const Error *const error);
 
+Error CreateSuccess();
+
 #define RETURN_EXITCODE_IF_FAIL(__error)                                                                               \
     {                                                                                                                  \
         if (IsFail(&(__error)))                                                                                        \
