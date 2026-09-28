@@ -72,9 +72,10 @@ Error CreateSuccess();
 
 #define RETURN_EXITCODE_IF_FAIL(__error)                                                                               \
     {                                                                                                                  \
-        if (IsFail(&(__error)))                                                                                        \
+        ExitCode __code = (__error).exitCode;                                                                          \
+        if (__code != ecSuccess)                                                                                       \
         {                                                                                                              \
-            return (__error).exitCode;                                                                                 \
+            return __code;                                                                                             \
         }                                                                                                              \
     }
 

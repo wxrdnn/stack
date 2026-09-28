@@ -8,11 +8,26 @@
 
 const size_t cStackCapMultiplierOnExtend = 2;
 
+enum StackErrorCode
+{
+    secSuccess = 0,
+    secNullStackPointer,
+    secNullDataPointer,
+    secNullDebugDataPointer,
+    secIncorrectDebugData,
+    secSizeLargerThanCapacity,
+    secPoisonValueDetected,
+    secNullNameInDebugData,
+    secNullCreationFileInDebugData,
+    secNullCreationFunctionInDebugData,
+};
+
 struct StackDebugData
 {
-    const char *const dName;
-    const char *const dCreationFile;
-    const size_t dCreationLine;
+    const char *name;
+    const char *creationFile;
+    const char *creationFunction;
+    size_t creationLine;
 };
 
 typedef int StackElem_t; // TODO remove it
@@ -26,7 +41,9 @@ struct Stack_t
     ONDEBUG(StackDebugData *debugData);
 };
 
-bool StackVerify(const Stack_t *const stk);
+StackErrorCode StackVerify(const Stack_t *const stk);
+
+StackErrorCode StackDebugDataVerify(const StackDebugData *const data);
 
 Error StackCreate(Stack_t **stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData));
 
@@ -36,10 +53,13 @@ StackElem_t StackPop(Stack_t *const stk, Error *const error);
 
 void StackDestroy(Stack_t *const stk);
 
-Error StackDump(const Stack_t *const stk);
+void StackDump(const Stack_t *const stk);
 
 Error StackExtend(Stack_t *stk);
 
 Error StackResize(Stack_t *stk, size_t newCapacity);
+
+Error StackDebugDataCreate(StackDebugData **stkDebugData, const char *const name, const char *const creationFile,
+                           const char *const creationFunction, const size_t creationLine);
 
 #endif

@@ -1,22 +1,76 @@
 #include "h/stack.h"
+#include "h/colors.h"
 #include "h/debug.h"
 #include "h/errorHandle.h"
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 
-bool StackVerify(const Stack_t *const stk)
+StackErrorCode StackVerify(const Stack_t *const stk)
 {
-    bool isCorrect = true;
-
-    isCorrect = stk && stk->data ONDEBUG(&&stk->debugData);
-    isCorrect = isCorrect && (stk->capacity >= stk->size);
-
-    if (!isCorrect)
+    if (!stk)
     {
-        StackDump(stk);
+        // StackDump(stk);
+        return secNullStackPointer;
     }
 
-    return isCorrect;
+    if (!stk->data)
+    {
+        // StackDump(stk);
+        return secNullDataPointer;
+    }
+
+    if (!stk->debugData)
+    {
+        // StackDump(stk);
+        return secNullDebugDataPointer;
+    }
+
+    ONDEBUG(
+
+        StackErrorCode debugDataCode = StackDebugDataVerify(stk->debugData);
+
+        if (debugDataCode != secSuccess) {
+            // StackDump(stk);
+            return debugDataCode;
+        }
+
+    )
+
+    if (stk->size > stk->capacity)
+    {
+        // StackDump(stk);
+        return secSizeLargerThanCapacity;
+    }
+
+    // TODO Poison value detection
+
+    return secSuccess;
+}
+
+StackErrorCode StackDebugDataVerify(const StackDebugData *const data)
+{
+    if (!data)
+    {
+        return secNullDebugDataPointer;
+    }
+
+    if (!data->name)
+    {
+        return secNullNameInDebugData;
+    }
+
+    if (!data->creationFile)
+    {
+        return secNullCreationFileInDebugData;
+    }
+
+    if (!data->creationFunction)
+    {
+        return secNullCreationFunctionInDebugData;
+    }
+
+    return secSuccess;
 }
 
 Error StackCreate(Stack_t **stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData))
@@ -41,13 +95,13 @@ Error StackCreate(Stack_t **stk, const size_t capacity ONDEBUG(, StackDebugData 
     (*stk)->size = 0;
     ONDEBUG((*stk)->debugData = debugData);
 
-    ASSERT(StackVerify(*stk));
+    ASSERT(StackVerify(*stk) == secSuccess);
     return error;
 }
 
 Error StackPush(Stack_t *const stk, StackElem_t element)
 {
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
     Error error = CreateSuccess();
 
     if (stk->size == stk->capacity)
@@ -64,28 +118,28 @@ Error StackPush(Stack_t *const stk, StackElem_t element)
 
     stk->data[stk->size++] = element;
 
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
     return error;
 }
 
 StackElem_t StackPop(Stack_t *const stk, Error *const error)
 {
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
 
     *error = CreateSuccess();
 
     StackElem_t poppedElement = stk->data[stk->size--]; // TODO Error handling
 
-    // if (log(stk->capacity) / log(stk->size))
+    // if (stl->capacity / stk->size > cStackCapMultipluer)
     // TODO Shrink if stack is smaller than its 2 extensions
 
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
     return poppedElement;
 }
 
 void StackDestroy(Stack_t *const stk)
 {
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
 
     free(stk->data);
     ONDEBUG(free(stk->debugData));
@@ -94,33 +148,107 @@ void StackDestroy(Stack_t *const stk)
     return;
 }
 
-Error StackDump(const Stack_t *const stk)
+// lang-format off
+void StackDump(const Stack_t *const stk) // Disables by NDEBUG
 {
+    ONDEBUG(
+
+        if (stk == NULL) {
+            fprintf(stderr, __RED "DEBUG: StackDump() got NULL instead of Stack_t pointer!\n" __RESET);
+            return;
+        }
+
+        if (StackDebugDataVerify(stk->debugData) != secSuccess) { // TODO expand it
+            fprintf(stderr, __RED "DEBUG: StackDump() got corrupted StackDebugData in Stack_t!\n" __RESET);
+        }
+
+        fprintf(stderr,
+                __YELLOW "DEBUG: Begin dump of Stack_t named \"%s\" at [%p] created in %s() at %s:%lu.\n" __RESET,
+                stk->debugData->name,
+                stk,
+                stk->debugData->creationFunction,
+                stk->debugData->creationFile,
+                stk->debugData->creationLine);
+
+        if (stk->data == NULL) {
+            fprintf(stderr, __RED "DEBUG: StackDump() got NULL data pointer in Stack_t!\n" __RESET);
+            return;
+        }
+
+        fprintf(stderr, __YELLOW);
+        fprintf(stderr, "DEBUG: Stack_t %s\n", stk->debugData->name);
+        fprintf(stderr, "DEBUG: {\n");
+        fprintf(stderr, "DEBUG:     capacity = %lu\n", stk->capacity);
+        fprintf(stderr, "DEBUG:     size = %lu\n", stk->size);
+        fprintf(stderr, "DEBUG:     data at [%p]\n", stk->data);
+        fprintf(stderr, "DEBUG:     {\n");
+
+        for (size_t i = 0; i < stk->capacity; ++i) {
+            fprintf(stderr,
+                    "DEBUG:         data[%lu] at [%p] = %d\n",
+                    i,
+                    stk->data + i,
+                    stk->data[i]); // TODO fix hardcoded StackElem_t format
+        }
+
+        fprintf(stderr, "DEBUG:     }\n");
+        fprintf(stderr, "DEBUG: }\n");
+        fprintf(stderr, __RESET);
+
+        fprintf(stderr,
+                __YELLOW "DEBUG: End dump of Stack_t named \"%s\" at [%p] created in %s() at %s:%lu.\n" __RESET,
+                stk->debugData->name,
+                stk,
+                stk->debugData->creationFunction,
+                stk->debugData->creationFile,
+                stk->debugData->creationLine);)
 }
+// lang-format on
 
 Error StackExtend(Stack_t *stk)
 {
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
 
     size_t newCapacity = stk->capacity * cStackCapMultiplierOnExtend;
     Error error = StackResize(stk, newCapacity);
 
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
     return error;
 }
 
 Error StackResize(Stack_t *stk, size_t newCapacity)
 {
-    ASSERT(StackVerify(stk));
+    ASSERT(StackVerify(stk) == secSuccess);
 
     Error error = CreateSuccess();
 
-    stk->data = (StackElem_t *)realloc(stk->data, newCapacity);
+    stk->data = (StackElem_t *)realloc(stk->data, newCapacity * sizeof(StackElem_t));
     if (!stk->data)
     {
         return error = CreateError(ecCantAllocateMemory, "Stack_t data extention");
     }
+    fprintf(stderr, __BLUE "DEBUG: New data size after realloc: %lu.\n" __RESET, newCapacity);
     stk->capacity = newCapacity;
+
+    ASSERT(StackVerify(stk) == secSuccess);
+    return error;
+}
+
+Error StackDebugDataCreate(StackDebugData **stkDebugData, const char *const name, const char *const creationFile,
+                           const char *const creationFunction, const size_t creationLine)
+{
+    Error error = CreateSuccess();
+    *stkDebugData = (StackDebugData *)calloc(1, sizeof(StackDebugData));
+    if (!(*stkDebugData))
+    {
+        error = CreateError(ecCantAllocateMemory, "Stack_t debug data");
+        return error;
+    }
+
+    (*stkDebugData)->name = name;
+    (*stkDebugData)->creationFile = creationFile;
+    (*stkDebugData)->creationFunction = creationFunction;
+    (*stkDebugData)->creationLine = creationLine;
 
     return error;
 }
