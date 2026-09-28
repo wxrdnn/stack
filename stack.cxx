@@ -227,7 +227,11 @@ Error StackResize(Stack_t *stk, size_t newCapacity)
     {
         return error = CreateError(ecCantAllocateMemory, "Stack_t data extention");
     }
-    fprintf(stderr, __BLUE "DEBUG: New data size after realloc: %lu.\n" __RESET, newCapacity);
+    ONDEBUG(fprintf(stderr,
+                    __BLUE "DEBUG: Resized Stack_t %s. Old size: %lu -> new size: %lu.\n" __RESET,
+                    stk->debugData->name,
+                    stk->capacity,
+                    newCapacity));
     stk->capacity = newCapacity;
 
     ASSERT(StackVerify(stk) == secSuccess);
