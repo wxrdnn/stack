@@ -1,6 +1,7 @@
 #include "h/debug.h"
 #include "h/errorHandle.h"
 #include "h/stack.h"
+#include <cassert>
 
 int main()
 {
@@ -17,12 +18,12 @@ int main()
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 0));
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 1));
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 2));
+    stk->data = NULL;
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 3));
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 4));
     RETURN_EXITCODE_IF_FAIL(error = StackPush(stk, 5));
 
     StackDump(stk);
-
     StackDestroy(stk);
     return 0;
 }

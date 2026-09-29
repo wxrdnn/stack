@@ -10,19 +10,19 @@ StackErrorCode StackVerify(const Stack_t *const stk)
 {
     if (!stk)
     {
-        // StackDump(stk);
+        StackDump(stk);
         return secNullStackPointer;
     }
 
     if (!stk->data)
     {
-        // StackDump(stk);
+        StackDump(stk);
         return secNullDataPointer;
     }
 
     if (!stk->debugData)
     {
-        // StackDump(stk);
+        StackDump(stk);
         return secNullDebugDataPointer;
     }
 
@@ -31,7 +31,7 @@ StackErrorCode StackVerify(const Stack_t *const stk)
         StackErrorCode debugDataCode = StackDebugDataVerify(stk->debugData);
 
         if (debugDataCode != secSuccess) {
-            // StackDump(stk);
+            StackDump(stk);
             return debugDataCode;
         }
 
@@ -39,7 +39,7 @@ StackErrorCode StackVerify(const Stack_t *const stk)
 
     if (stk->size > stk->capacity)
     {
-        // StackDump(stk);
+        StackDump(stk);
         return secSizeLargerThanCapacity;
     }
 
@@ -154,12 +154,12 @@ void StackDump(const Stack_t *const stk) // Disables by NDEBUG
     ONDEBUG(
 
         if (stk == NULL) {
-            fprintf(stderr, __RED "DEBUG: StackDump() got NULL instead of Stack_t pointer!\n" __RESET);
+            fprintf(stderr, __RED "ERROR: StackDump() got NULL instead of Stack_t pointer!\n" __RESET);
             return;
         }
 
         if (StackDebugDataVerify(stk->debugData) != secSuccess) { // TODO expand it
-            fprintf(stderr, __RED "DEBUG: StackDump() got corrupted StackDebugData in Stack_t!\n" __RESET);
+            fprintf(stderr, __RED "ERROR: StackDump() got corrupted StackDebugData in Stack_t!\n" __RESET);
         }
 
         fprintf(stderr,
@@ -171,7 +171,10 @@ void StackDump(const Stack_t *const stk) // Disables by NDEBUG
                 stk->debugData->creationLine);
 
         if (stk->data == NULL) {
-            fprintf(stderr, __RED "DEBUG: StackDump() got NULL data pointer in Stack_t!\n" __RESET);
+            fprintf(
+                stderr,
+                __RED
+                "ERROR: StackDump() got NULL data pointer in Stack_t!\n" __RESET); // TODO still print size and capacity
             return;
         }
 

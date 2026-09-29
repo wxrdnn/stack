@@ -13,8 +13,7 @@
         if (!(statement))                                                                                              \
         {                                                                                                              \
             fprintf(stderr,                                                                                            \
-                    __RED "Assertion \'" #statement "\' failed!" __RESET __BLUE "\nFile: " __RESET __YELLOW            \
-                          "%s" __RESET __BLUE "\nLine: " __RESET __CYAN "%d\n" __RESET,                                \
+                    __RED "Assertion \'" #statement "\' failed at " __RESET __BLUE "%s:%d.\n" __RESET,                 \
                     __FILE_NAME__,                                                                                     \
                     __LINE__);                                                                                         \
             abort();                                                                                                   \
