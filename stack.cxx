@@ -20,13 +20,12 @@ StackErrorCode StackVerify(const Stack_t *const stk)
         return secNullDataPointer;
     }
 
-    if (!stk->debugData)
-    {
-        StackDump(stk);
-        return secNullDebugDataPointer;
-    }
-
     ONDEBUG(
+
+        if (!stk->debugData) {
+            StackDump(stk);
+            return secNullDebugDataPointer;
+        }
 
         StackErrorCode debugDataCode = StackDebugDataVerify(stk->debugData);
 
@@ -73,29 +72,28 @@ StackErrorCode StackDebugDataVerify(const StackDebugData *const data)
     return secSuccess;
 }
 
-Error StackCreate(Stack_t **stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData))
+Error StackCreate(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData))
 {
     ASSERT(stk);
     ONDEBUG(ASSERT(debugData));
 
     Error error = CreateSuccess();
-    *stk = (Stack_t *)calloc(1, sizeof(Stack_t));
-    if (!(*stk))
+    if (!(stk))
     {
         return error = CreateError(ecCantAllocateMemory, "Stack_t structure");
     }
 
-    (*stk)->data = (StackElem_t *)calloc(capacity, sizeof(StackElem_t));
-    if (!(*stk)->data)
+    (stk)->data = (StackElem_t *)calloc(capacity, sizeof(StackElem_t));
+    if (!(stk)->data)
     {
         return error = CreateError(ecCantAllocateMemory, "Stack_t element");
     }
 
-    (*stk)->capacity = capacity;
-    (*stk)->size = 0;
-    ONDEBUG((*stk)->debugData = debugData);
+    (stk)->capacity = capacity;
+    (stk)->size = 0;
+    ONDEBUG((stk)->debugData = debugData);
 
-    ASSERT(StackVerify(*stk) == secSuccess);
+    VERIFY_STACK(stk);
     return error;
 }
 
@@ -137,14 +135,13 @@ StackElem_t StackPop(Stack_t *const stk, Error *const error)
     return poppedElement;
 }
 
-void StackDestroy(Stack_t *const stk)
+void FreeStackData(Stack_t *const stk)
 {
     ASSERT(StackVerify(stk) == secSuccess);
 
     free(stk->data);
-    ONDEBUG(free(stk->debugData));
+    // ONDEBUG(free(stk->debugData));
 
-    free(stk);
     return;
 }
 
@@ -241,21 +238,22 @@ Error StackResize(Stack_t *stk, size_t newCapacity)
     return error;
 }
 
-Error StackDebugDataCreate(StackDebugData **stkDebugData, const char *const name, const char *const creationFile,
+Error StackDebugDataCreate(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
                            const char *const creationFunction, const size_t creationLine)
 {
+    ASSERT(stkDebugData);
+
     Error error = CreateSuccess();
-    *stkDebugData = (StackDebugData *)calloc(1, sizeof(StackDebugData));
-    if (!(*stkDebugData))
+    if (!(stkDebugData))
     {
         error = CreateError(ecCantAllocateMemory, "Stack_t debug data");
         return error;
     }
 
-    (*stkDebugData)->name = name;
-    (*stkDebugData)->creationFile = creationFile;
-    (*stkDebugData)->creationFunction = creationFunction;
-    (*stkDebugData)->creationLine = creationLine;
+    (stkDebugData)->name = name;
+    (stkDebugData)->creationFile = creationFile;
+    (stkDebugData)->creationFunction = creationFunction;
+    (stkDebugData)->creationLine = creationLine;
 
     return error;
 }
