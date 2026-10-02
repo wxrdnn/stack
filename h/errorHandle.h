@@ -30,7 +30,7 @@ enum ExitCode
 struct Error
 {
     ExitCode exitCode;
-    char context[cMaxLine];
+    char context[cMaxLine]; // TODO replace with pointer
 };
 
 //----------------------------------------------------------

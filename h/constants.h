@@ -4,6 +4,6 @@
 
 #include <cstddef>
 
-const size_t cMaxLine = 1024;
+const size_t cMaxLine = 256;
 
 #endif

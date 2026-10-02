@@ -2,46 +2,48 @@
 #include "h/colors.h"
 #include "h/debug.h"
 #include "h/errorHandle.h"
+#include "h/hash.h"
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
-StackErrorCode StackVerify(const Stack_t *const stk)
+StackErrorCode _StackVerify(const Stack_t *const stk)
 {
     if (!stk)
     {
-        StackDump(stk);
+        STACK_DUMP(stk);
         return secNullStackPointer;
     }
 
     if (!stk->data)
     {
-        StackDump(stk);
+        STACK_DUMP(stk);
         return secNullDataPointer;
     }
 
     ONDEBUG(
 
         if (stk->canaryTop != cCanaryValue) {
-            StackDump(stk);
+            STACK_DUMP(stk);
             return secTopCanaryChanged;
         }
 
         if (stk->canaryBottom != cCanaryValue) {
-            StackDump(stk);
+            STACK_DUMP(stk);
             return secBottomCanaryChanged;
         }
 
         if (!stk->debugData) {
-            StackDump(stk);
+            STACK_DUMP(stk);
             return secNullDebugDataPointer;
         }
 
         StackErrorCode debugDataCode = StackDebugDataVerify(stk->debugData);
 
         if (debugDataCode != secSuccess) {
-            StackDump(stk);
+            STACK_DUMP(stk);
             return debugDataCode;
         }
 
@@ -49,9 +51,22 @@ StackErrorCode StackVerify(const Stack_t *const stk)
 
     if (stk->size > stk->capacity)
     {
-        StackDump(stk);
+        STACK_DUMP(stk);
         return secSizeLargerThanCapacity;
     }
+
+#ifdef USE_HASH_PROT
+    uint64_t hash = CalcStackHash(stk);
+    // fprintf(stderr,
+    //         "DEBUG: Comparing hashes in _StackVerify. Stored hash: <0x%lx>, Calculated hash: <0x%lx>\n",
+    //         stk->hash,
+    //         hash);
+    if (hash != stk->hash)
+    {
+        STACK_DUMP(stk);
+        return secStackHashChangedUnexpected;
+    }
+#endif
 
     // TODO Poison value detection
 
@@ -102,19 +117,21 @@ Error StackInit(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugDa
 
     (stk)->capacity = capacity;
     (stk)->size = 0;
-    ONDEBUG(
+    ONDEBUG(stk->debugData = debugData;)
 
-        (stk)->debugData = debugData; stk->canaryTop = cCanaryValue; stk->canaryBottom = cCanaryValue;
+#ifdef USE_CANARY_PROT
+    stk->canaryTop = cCanaryValue;
+    stk->canaryBottom = cCanaryValue;
+#endif
 
-    )
-
+    UpdateStackHash(stk);
     VERIFY_STACK(stk);
     return error;
 }
 
 Error StackPush(Stack_t *const stk, StackElem_t element)
 {
-    ASSERT(StackVerify(stk) == secSuccess);
+    VERIFY_STACK(stk);
     Error error = CreateSuccess();
 
     // error.exitCode = ecFileIsBusy;
@@ -134,28 +151,31 @@ Error StackPush(Stack_t *const stk, StackElem_t element)
 
     stk->data[stk->size++] = element;
 
-    ASSERT(StackVerify(stk) == secSuccess);
+    UpdateStackHash(stk);
+    VERIFY_STACK(stk);
     return error;
 }
 
 StackElem_t StackPop(Stack_t *const stk, Error *const error)
 {
-    ASSERT(StackVerify(stk) == secSuccess);
+    VERIFY_STACK(stk);
 
     *error = CreateSuccess();
 
+    // TODO size check before pop
     StackElem_t poppedElement = stk->data[stk->size--]; // TODO Error handling
 
     // if (stl->capacity / stk->size > cStackCapMultipluer)
     // TODO Shrink if stack is smaller than its 2 extensions
 
-    ASSERT(StackVerify(stk) == secSuccess);
+    UpdateStackHash(stk);
+    VERIFY_STACK(stk);
     return poppedElement;
 }
 
 void StackFreeData(Stack_t *const stk)
 {
-    ASSERT(StackVerify(stk) == secSuccess);
+    ASSERT(_StackVerify(stk) == secSuccess);
 
     free(stk->data);
     // ONDEBUG(free(stk->debugData));
@@ -164,7 +184,7 @@ void StackFreeData(Stack_t *const stk)
 }
 
 // lang-format off
-void StackDump(const Stack_t *const stk) // Disables by NDEBUG
+void _StackDump(const Stack_t *const stk) // Disables by NDEBUG
 {
     ONDEBUG(
 
@@ -173,10 +193,15 @@ void StackDump(const Stack_t *const stk) // Disables by NDEBUG
             return;
         }
 
-        if (StackDebugDataVerify(stk->debugData) != secSuccess) { // TODO expand it
-            fprintf(stderr, __RED "ERROR: StackDump() got corrupted StackDebugData in Stack_t!\n" __RESET);
+        StackErrorCode errCode = StackDebugDataVerify(stk->debugData);
+        if (errCode != secSuccess) { // TODO expand it
+            fprintf(stderr,
+                    __RED "ERROR: StackDump() got corrupted StackDebugData in Stack_t! StackErrorCode = %d\n" __RESET,
+                    errCode);
+            return;
         }
 
+        fprintf(stderr, __YELLOW "DEBUG: ------------------------------------------------------\n" __RESET);
         fprintf(stderr,
                 __YELLOW "DEBUG: Begin dump of Stack_t named \"%s\" at [%p] created in %s() at %s:%lu.\n" __RESET,
                 stk->debugData->name,
@@ -226,35 +251,39 @@ void StackDump(const Stack_t *const stk) // Disables by NDEBUG
                 stk,
                 stk->debugData->creationFunction,
                 stk->debugData->creationFile,
-                stk->debugData->creationLine);)
+                stk->debugData->creationLine);
+
+        fprintf(stderr, __YELLOW "DEBUG: ------------------------------------------------------\n" __RESET);)
 }
 // lang-format on
 
 Error StackExtend(Stack_t *stk)
 {
-    ASSERT(StackVerify(stk) == secSuccess);
+    VERIFY_STACK(stk);
 
     size_t newCapacity = stk->capacity * cStackCapMultiplierOnExtend;
     size_t oldCapacity = stk->capacity;
     Error error = StackResize(stk, newCapacity);
-    fprintf(stderr,
-            "DEBUG: Values before memset: oldCapacity = %lu, newCapacity = %lu, cIntPoisonValue = %d\n",
-            oldCapacity,
-            newCapacity,
-            cIntPoisonValue);
+    // fprintf(stderr,
+    //         "DEBUG: Values before memset: oldCapacity = %lu, newCapacity = %lu, cIntPoisonValue = %d\n",
+    //         oldCapacity,
+    //         newCapacity,
+    //         cIntPoisonValue);
     // Instead of memset, that sets values by 1 byte: 0xB1BAB0BA -> 0xBABABABA
+    // memset(stk->data + oldCapacity, cIntPoisonValue, newCapacity - oldCapacity);
     for (size_t i = oldCapacity; i < newCapacity; ++i)
     {
         stk->data[i] = cIntPoisonValue;
     }
 
-    ASSERT(StackVerify(stk) == secSuccess);
+    UpdateStackHash(stk);
+    VERIFY_STACK(stk);
     return error;
 }
 
 Error StackResize(Stack_t *stk, size_t newCapacity)
 {
-    ASSERT(StackVerify(stk) == secSuccess);
+    VERIFY_STACK(stk);
 
     Error error = CreateSuccess();
 
@@ -270,7 +299,8 @@ Error StackResize(Stack_t *stk, size_t newCapacity)
                     newCapacity));
     stk->capacity = newCapacity;
 
-    ASSERT(StackVerify(stk) == secSuccess);
+    UpdateStackHash(stk);
+    VERIFY_STACK(stk);
     return error;
 }
 
@@ -280,11 +310,11 @@ Error StackDebugDataInit(StackDebugData *const stkDebugData, const char *const n
     ASSERT(stkDebugData);
 
     Error error = CreateSuccess();
-    if (!(stkDebugData))
-    {
-        error = CreateError(ecCantAllocateMemory, "Stack_t debug data");
-        return error;
-    }
+    // if (!(stkDebugData))
+    // {
+    //     error = CreateError(ecCantAllocateMemory, "Stack_t debug data");
+    //     return error;
+    // }
 
     (stkDebugData)->name = name;
     (stkDebugData)->creationFile = creationFile;
@@ -292,4 +322,34 @@ Error StackDebugDataInit(StackDebugData *const stkDebugData, const char *const n
     (stkDebugData)->creationLine = creationLine;
 
     return error;
+}
+
+uint64_t CalcStackHash(const Stack_t *const stk)
+{
+    const char *startHashAt = (const char *)stk;
+
+#ifdef USE_CANARY_PROT
+    startHashAt += sizeof(stk->canaryTop);
+#endif
+    // clang-format off
+    size_t nBytesToHash =
+        sizeof(stk->data)
+        + sizeof(stk->capacity)
+        + sizeof(stk->size)
+    ONDEBUG(+sizeof(stk->debugData));
+    // clang-format on
+
+    uint64_t hashOfStack = CalcHash(startHashAt, nBytesToHash);
+    uint64_t hashOfStackData = CalcHash(stk->data, stk->capacity * sizeof(*stk->data));
+    uint64_t hashOfStackDebugData = CalcHash(stk->debugData, sizeof(*stk->debugData));
+
+    return hashOfStack + hashOfStackData + hashOfStackDebugData;
+}
+
+void UpdateStackHash(Stack_t *const stk)
+{
+    ASSERT(stk);
+
+    stk->hash = CalcStackHash(stk);
+    // fprintf(stderr, "DEBUG: Called UpdateStackHash(). New hash: <0x%lx>\n", stk->hash);
 }

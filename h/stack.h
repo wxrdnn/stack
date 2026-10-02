@@ -2,6 +2,9 @@
 
 #define STACK_H
 
+#define USE_CANARY_PROT
+#define USE_HASH_PROT
+
 #include "debug.h"
 #include "errorHandle.h"
 #include <cstdint>
@@ -24,7 +27,8 @@ enum StackErrorCode
     secNullCreationFileInDebugData,
     secNullCreationFunctionInDebugData,
     secTopCanaryChanged,
-    secBottomCanaryChanged
+    secBottomCanaryChanged,
+    secStackHashChangedUnexpected,
 };
 
 struct StackDebugData
@@ -39,18 +43,35 @@ typedef int StackElem_t; // TODO remove it
 
 struct Stack_t
 {
-    ONDEBUG(uint64_t canaryTop;)
+#ifdef USE_CANARY_PROT
+    uint64_t canaryTop;
+#endif
+
+    // True stack data
     StackElem_t *data;
     size_t capacity;
     size_t size;
+    // End
 
     ONDEBUG(StackDebugData *debugData);
-    ONDEBUG(uint64_t canaryBottom;)
+
+#ifdef USE_HASH_PROT
+    uint64_t hash;
+#endif
+
+#ifdef USE_CANARY_PROT
+    uint64_t canaryBottom;
+#endif
 };
 
 #define VERIFY_STACK(__stk)                                                                                            \
     {                                                                                                                  \
-        StackErrorCode __stkErrCode = StackVerify(__stk);                                                              \
+        fprintf(stderr,                                                                                                \
+                __YELLOW "DEBUG: _StackVerify() called in %s() at %s:%d\n" __RESET,                                    \
+                __FUNCTION__,                                                                                          \
+                __FILE__,                                                                                              \
+                __LINE__);                                                                                             \
+        StackErrorCode __stkErrCode = _StackVerify(__stk);                                                             \
         if (__stkErrCode != secSuccess)                                                                                \
         {                                                                                                              \
             fprintf(                                                                                                   \
@@ -59,7 +80,17 @@ struct Stack_t
         ASSERT(__stkErrCode == secSuccess);                                                                            \
     }
 
-StackErrorCode StackVerify(const Stack_t *const stk);
+#define STACK_DUMP(__stk)                                                                                              \
+    {                                                                                                                  \
+        fprintf(stderr,                                                                                                \
+                __YELLOW "DEBUG: _StackDump() called in %s() at %s:%d\n" __RESET,                                      \
+                __FUNCTION__,                                                                                          \
+                __FILE__,                                                                                              \
+                __LINE__);                                                                                             \
+        _StackDump(__stk);                                                                                             \
+    }
+
+StackErrorCode _StackVerify(const Stack_t *const stk); // Call via VERIFY_STACK
 
 StackErrorCode StackDebugDataVerify(const StackDebugData *const data);
 
@@ -71,7 +102,7 @@ StackElem_t StackPop(Stack_t *const stk, Error *const error);
 
 void StackFreeData(Stack_t *const stk);
 
-void StackDump(const Stack_t *const stk);
+void _StackDump(const Stack_t *const stk); // Call via STACK_DUMP
 
 Error StackExtend(Stack_t *stk);
 
@@ -79,5 +110,9 @@ Error StackResize(Stack_t *stk, size_t newCapacity);
 
 Error StackDebugDataInit(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
                          const char *const creationFunction, const size_t creationLine);
+
+uint64_t CalcStackHash(const Stack_t *const stk);
+
+void UpdateStackHash(Stack_t *const stk);
 
 #endif
