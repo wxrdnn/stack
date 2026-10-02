@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 StackErrorCode StackVerify(const Stack_t *const stk)
 {
@@ -72,7 +73,7 @@ StackErrorCode StackDebugDataVerify(const StackDebugData *const data)
     return secSuccess;
 }
 
-Error StackCreate(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData))
+Error StackInit(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData))
 {
     ASSERT(stk);
     ONDEBUG(ASSERT(debugData));
@@ -101,6 +102,9 @@ Error StackPush(Stack_t *const stk, StackElem_t element)
 {
     ASSERT(StackVerify(stk) == secSuccess);
     Error error = CreateSuccess();
+
+    // error.exitCode = ecFileIsBusy;
+    // return error;
 
     if (stk->size == stk->capacity)
     {
@@ -135,7 +139,7 @@ StackElem_t StackPop(Stack_t *const stk, Error *const error)
     return poppedElement;
 }
 
-void FreeStackData(Stack_t *const stk)
+void StackFreeData(Stack_t *const stk)
 {
     ASSERT(StackVerify(stk) == secSuccess);
 
@@ -185,10 +189,17 @@ void StackDump(const Stack_t *const stk) // Disables by NDEBUG
 
         for (size_t i = 0; i < stk->capacity; ++i) {
             fprintf(stderr,
-                    "DEBUG:         data[%lu] at [%p] = %d\n",
+                    "DEBUG:         data[%lu] at [%p] = %d",
                     i,
                     stk->data + i,
                     stk->data[i]); // TODO fix hardcoded StackElem_t format
+
+            if (stk->data[i] == cIntPoisonValue)
+            {
+                fprintf(stderr, "\t\t <- Poison value");
+            }
+
+            fprintf(stderr, "\n");
         }
 
         fprintf(stderr, "DEBUG:     }\n");
@@ -210,7 +221,18 @@ Error StackExtend(Stack_t *stk)
     ASSERT(StackVerify(stk) == secSuccess);
 
     size_t newCapacity = stk->capacity * cStackCapMultiplierOnExtend;
+    size_t oldCapacity = stk->capacity;
     Error error = StackResize(stk, newCapacity);
+    fprintf(stderr,
+            "DEBUG: Values before memset: oldCapacity = %lu, newCapacity = %lu, cIntPoisonValue = %d\n",
+            oldCapacity,
+            newCapacity,
+            cIntPoisonValue);
+    // Instead of memset, that sets values by 1 byte: 0xB1BAB0BA -> 0xBABABABA
+    for (size_t i = oldCapacity; i < newCapacity; ++i)
+    {
+        stk->data[i] = cIntPoisonValue;
+    }
 
     ASSERT(StackVerify(stk) == secSuccess);
     return error;
@@ -238,8 +260,8 @@ Error StackResize(Stack_t *stk, size_t newCapacity)
     return error;
 }
 
-Error StackDebugDataCreate(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
-                           const char *const creationFunction, const size_t creationLine)
+Error StackDebugDataInit(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
+                         const char *const creationFunction, const size_t creationLine)
 {
     ASSERT(stkDebugData);
 

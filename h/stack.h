@@ -4,9 +4,12 @@
 
 #include "debug.h"
 #include "errorHandle.h"
+#include <cstdint>
 #include <stddef.h>
 
 const size_t cStackCapMultiplierOnExtend = 2;
+const int cIntPoisonValue = 0xB1BAB0BA;
+const uint64_t cCanaryValue = 0xB00B1E5;
 
 enum StackErrorCode
 {
@@ -56,13 +59,13 @@ StackErrorCode StackVerify(const Stack_t *const stk);
 
 StackErrorCode StackDebugDataVerify(const StackDebugData *const data);
 
-Error StackCreate(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData));
+Error StackInit(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugData *const debugData));
 
 Error StackPush(Stack_t *const stk, StackElem_t element);
 
 StackElem_t StackPop(Stack_t *const stk, Error *const error);
 
-void FreeStackData(Stack_t *const stk);
+void StackFreeData(Stack_t *const stk);
 
 void StackDump(const Stack_t *const stk);
 
@@ -70,7 +73,7 @@ Error StackExtend(Stack_t *stk);
 
 Error StackResize(Stack_t *stk, size_t newCapacity);
 
-Error StackDebugDataCreate(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
-                           const char *const creationFunction, const size_t creationLine);
+Error StackDebugDataInit(StackDebugData *const stkDebugData, const char *const name, const char *const creationFile,
+                         const char *const creationFunction, const size_t creationLine);
 
 #endif
