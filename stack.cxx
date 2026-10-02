@@ -23,6 +23,16 @@ StackErrorCode StackVerify(const Stack_t *const stk)
 
     ONDEBUG(
 
+        if (stk->canaryTop != cCanaryValue) {
+            StackDump(stk);
+            return secTopCanaryChanged;
+        }
+
+        if (stk->canaryBottom != cCanaryValue) {
+            StackDump(stk);
+            return secBottomCanaryChanged;
+        }
+
         if (!stk->debugData) {
             StackDump(stk);
             return secNullDebugDataPointer;
@@ -92,7 +102,11 @@ Error StackInit(Stack_t *const stk, const size_t capacity ONDEBUG(, StackDebugDa
 
     (stk)->capacity = capacity;
     (stk)->size = 0;
-    ONDEBUG((stk)->debugData = debugData);
+    ONDEBUG(
+
+        (stk)->debugData = debugData; stk->canaryTop = cCanaryValue; stk->canaryBottom = cCanaryValue;
+
+    )
 
     VERIFY_STACK(stk);
     return error;

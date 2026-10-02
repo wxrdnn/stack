@@ -8,7 +8,7 @@
 #include <stddef.h>
 
 const size_t cStackCapMultiplierOnExtend = 2;
-const int cIntPoisonValue = 0xB1BAB0BA;
+const int cIntPoisonValue = (int)0xB1BAB0BA;
 const uint64_t cCanaryValue = 0xB00B1E5;
 
 enum StackErrorCode
@@ -23,6 +23,8 @@ enum StackErrorCode
     secNullNameInDebugData,
     secNullCreationFileInDebugData,
     secNullCreationFunctionInDebugData,
+    secTopCanaryChanged,
+    secBottomCanaryChanged
 };
 
 struct StackDebugData
@@ -37,11 +39,13 @@ typedef int StackElem_t; // TODO remove it
 
 struct Stack_t
 {
+    ONDEBUG(uint64_t canaryTop;)
     StackElem_t *data;
     size_t capacity;
     size_t size;
 
     ONDEBUG(StackDebugData *debugData);
+    ONDEBUG(uint64_t canaryBottom;)
 };
 
 #define VERIFY_STACK(__stk)                                                                                            \
